@@ -1,0 +1,1 @@
+This was a project to explore concurrency using [ZIO](zio.dev). It also uses [scalaz-nio](https://github.com/scalaz/scalaz-nio) for socket access. Thanks to the friendly folks in the ZIO gitter channel for helping me understand how to make it work. 
