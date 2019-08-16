@@ -1,8 +1,10 @@
-import scalaz.nio._
-import scalaz.nio.channels.{AsynchronousServerSocketChannel, AsynchronousSocketChannel}
-import scalaz.zio.clock.Clock
-import scalaz.zio.console._
-import scalaz.zio.{App, ZIO, _}
+import java.io.IOException
+
+import zio.nio._
+import zio.nio.channels.{AsynchronousServerSocketChannel, AsynchronousSocketChannel}
+import zio.clock.Clock
+import zio.console._
+import zio.{App, ZIO, _}
 
 
 object Main extends App {
@@ -31,7 +33,7 @@ object Main extends App {
     for {
       i    <- ref.update(_+1)
       _    <- putStrLn("accept")
-      _    <- socket.accept.flatMap(s => socketChannelWorker(i)(s).ensuring(s.close.orDie).fork)
+      _    <- socket.accept.flatMap(s => socketChannelWorker(i)(s).catchSome { case _: IOException => s.close}.fork)
       loop <- awaitConnection(ref, socket, worker)
     } yield loop
   }
@@ -46,10 +48,8 @@ object Main extends App {
         text   = bytes.map(_.toChar).map( c => if (c.isControl) s"${c.toHexString.toUpperCase}" else s"$c" ).mkString
         _      <- channel.write(chunk)
         _      <- putStrLn(s"content for con $i: " + text)
-        isOpen <- channel.isOpen
-        // isOpen doesn't seem to change to false. When the connection closes, read() seems to return a buffer
-        // of all zero bytes.
-        loop   <- if (isOpen && !chunk.toArray.forall(_ == 0)) socketChannelWorker(i)(channel) else ZIO.unit
-      } yield loop
-  }
+      } yield ()
+  }.whenM(channel.isOpen)
+    .forever
+    .ensuring(putStrLn("closing channel") *> channel.close.orDie)
 }
